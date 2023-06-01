@@ -1,74 +1,70 @@
-import { computed, effect, Injectable, signal } from "@angular/core";
-import { adapt } from "@state-adapt/angular"
+import { effect, inject, Injectable } from "@angular/core";
+import { toSignal } from "@angular/core/rxjs-interop";
+import { adapt } from "@state-adapt/angular";
+import { Action } from "@state-adapt/core";
+import { Source, toSource } from "@state-adapt/rxjs";
+import { map } from "rxjs";
 import { ChecklistItemService } from "../../checklist/data-access/checklist-item.service";
-import { AddChecklist, Checklist } from "../interfaces/checklist";
+import {
+  AddChecklist,
+  EditChecklist,
+  RemoveChecklist,
+} from "../interfaces/checklist";
+import { initialState, checklistsAdapter } from "./checklist.adapter";
 import { StorageService } from "./storage.service";
 
 @Injectable({
   providedIn: "root",
 })
 export class ChecklistService {
-  // private checklists = signal<Checklist[]>([]);
-  private checklistsStore = adapt<Checklist[]>('checklists', [])
+  checklistItemService = inject(ChecklistItemService);
+  storageService = inject(StorageService);
 
-  constructor(
-    private storageService: StorageService,
-    private checklistItemService: ChecklistItemService
-  ) {}
+  private checklistsLoaded$ = this.storageService
+    .loadChecklists()
+    .pipe(toSource("[Storage] checklists loaded"));
 
-  load() {
+  private add$ = new Source<AddChecklist>("[Checklists] add");
+  private remove$ = new Source<RemoveChecklist>("[Checklists] remove");
+  private edit$ = new Source<EditChecklist>("[Checklists] edit");
 
-    // TODO: want this to be observable that is used to update state adapt
-    const checklists = this.storageService.loadChecklists();
-    this.checklists.set(checklists);
+  store = adapt(["checklists", initialState, checklistsAdapter], {
+    loadChecklists: this.checklistsLoaded$,
+    add: this.add$.pipe(map((checklist) => this.addIdToChecklist(checklist))),
+    remove: this.remove$,
+    edit: this.edit$,
+  });
 
-    effect(() => {
+  loaded = toSignal(this.store.loaded$, { requireSync: true });
+  checklists = toSignal(this.store.checklists$, { requireSync: true });
+
+  checklistsChanged = effect(() => {
+    if (this.loaded()) {
       this.storageService.saveChecklists(this.checklists());
-    });
-  }
-
-  getChecklists() {
-    return computed(() => this.checklists());
-  }
-
-  getChecklistById(id: string) {
-    return computed(() => {
-      const checklist = this.checklists().find(
-        (checklist) => checklist.id === id
-      );
-
-      if (!checklist) {
-        throw new Error("No checklist matching id");
-      }
-
-      return checklist;
-    });
-  }
+    }
+  });
 
   add(checklist: AddChecklist) {
-    const newChecklist = {
-      ...checklist,
-      id: this.generateSlug(checklist.title),
-    };
-
-    this.checklists.mutate((checklists) => checklists.push(newChecklist));
+    this.add$.next(checklist);
   }
 
   remove(id: string) {
-    this.checklistItemService.removeAllItemsForChecklist(id);
-    this.checklists.update((checklists) =>
-      checklists.filter((checklist) => checklist.id !== id)
-    );
+    this.checklistItemService.clearChecklistItems(id);
+    this.remove$.next(id);
   }
 
-  update(id: string, editedData: AddChecklist) {
-    this.checklists.update((checklists) =>
-      checklists.map((checklist) =>
-        checklist.id === id
-          ? { ...checklist, title: editedData.title }
-          : checklist
-      )
-    );
+  edit(id: string, data: AddChecklist) {
+    this.edit$.next({ id, data });
+  }
+
+  private addIdToChecklist(checklist: Action<AddChecklist, string>) {
+    return {
+      ...checklist,
+      payload: {
+        ...checklist.payload,
+        id: this.generateSlug(checklist.payload.title),
+      },
+    };
   }
 
   private generateSlug(title: string) {

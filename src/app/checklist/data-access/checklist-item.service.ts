@@ -1,79 +1,75 @@
-import { Injectable, signal, effect, computed } from "@angular/core";
+import { Injectable, signal, effect, computed, inject } from "@angular/core";
+import { toSignal } from "@angular/core/rxjs-interop";
+import { adapt } from "@state-adapt/angular";
+import { Source, toSource } from "@state-adapt/rxjs";
+import { RemoveChecklist } from "src/app/shared/interfaces/checklist";
 import { StorageService } from "../../shared/data-access/storage.service";
 import {
   AddChecklistItem,
-  ChecklistItem,
+  EditChecklistItem,
+  RemoveChecklistItem,
 } from "../../shared/interfaces/checklist-item";
+import { checklistItemsAdapter, initialState } from "./checklist-item.adapter";
 
 @Injectable({
   providedIn: "root",
 })
 export class ChecklistItemService {
-  private checklistItems = signal<ChecklistItem[]>([]);
+  storageService = inject(StorageService);
 
-  constructor(private storageService: StorageService) {}
+  private checklistItemsLoaded$ = this.storageService
+    .loadChecklistItems()
+    .pipe(toSource("[Storage] checklist items loaded"));
 
-  load() {
-    const checklistItems = this.storageService.loadChecklistItems();
-    this.checklistItems.set(checklistItems);
+  private add$ = new Source<AddChecklistItem>("[Checklist Items] add");
+  private remove$ = new Source<RemoveChecklistItem>("[Checklist Items] remove");
+  private edit$ = new Source<EditChecklistItem>("[Checklist Items] edit");
+  private clearChecklistItems$ = new Source<RemoveChecklist>(
+    "[Checklist Items] removeAllItems"
+  );
+  private toggle$ = new Source<RemoveChecklistItem>("[Checklist Items] toggle");
+  private reset$ = new Source<RemoveChecklist>("[Checklist Items] reset");
 
-    effect(() => {
+  store = adapt(["checklistItems", initialState, checklistItemsAdapter], {
+    loadChecklistItems: this.checklistItemsLoaded$,
+    add: this.add$,
+    remove: this.remove$,
+    edit: this.edit$,
+    toggle: this.toggle$,
+    reset: this.reset$,
+    clearChecklistItems: this.clearChecklistItems$,
+  });
+
+  loaded = toSignal(this.store.loaded$, { requireSync: true });
+  checklistItems = toSignal(this.store.checklistItems$, { requireSync: true });
+
+  checklistItemsChanged = effect(() => {
+    if (this.loaded()) {
       this.storageService.saveChecklistItems(this.checklistItems());
-    });
+    }
+  });
+
+  reset(checklistId: RemoveChecklist) {
+    this.reset$.next(checklistId)
   }
 
-  getItemsByChecklistId(checklistId: string) {
-    return computed(() =>
-      this.checklistItems().filter((item) => item.checklistId === checklistId)
-    );
+  toggle(itemId: RemoveChecklistItem) {
+    this.toggle$.next(itemId);
   }
 
-  reset(checklistId: string) {
-    this.checklistItems.update((items) =>
-      items.map((item) =>
-        item.checklistId === checklistId ? { ...item, checked: false } : item
-      )
-    );
+  add(item: AddChecklistItem) {
+    this.add$.next(item)
   }
 
-  toggle(itemId: string) {
-    this.checklistItems.update((items) =>
-      items.map((item) =>
-        item.id === itemId ? { ...item, checked: !item.checked } : item
-      )
-    );
+  edit(item: EditChecklistItem) {
+    this.edit$.next(item);
   }
 
-  add(item: AddChecklistItem, checklistId: string) {
-    const newItem = {
-      id: Date.now().toString(),
-      checklistId,
-      checked: false,
-      ...item,
-    };
-
-    this.checklistItems.mutate((checklistItems) =>
-      checklistItems.push(newItem)
-    );
+  remove(id: RemoveChecklistItem) {
+    this.remove$.next(id);
   }
 
-  update(id: string, editedItem: AddChecklistItem) {
-    this.checklistItems.update((items) =>
-      items.map((item) =>
-        item.id === id ? { ...item, title: editedItem.title } : item
-      )
-    );
-  }
-
-  remove(id: string) {
-    this.checklistItems.update((items) =>
-      items.filter((item) => item.id !== id)
-    );
-  }
-
-  removeAllItemsForChecklist(checklistId: string) {
-    this.checklistItems.update((items) =>
-      items.filter((item) => item.checklistId !== checklistId)
-    );
+  clearChecklistItems(checklistId: RemoveChecklist) {
+    this.clearChecklistItems$.next(checklistId);
   }
 }

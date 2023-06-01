@@ -43,10 +43,11 @@ import { ChecklistListComponent } from "./ui/checklist-list.component";
   ],
 })
 export default class HomeComponent {
+
   formModalIsOpen = signal(false);
   checklistIdBeingEdited = signal<string | null>(null);
 
-  checklists = this.checklistService.getChecklists();
+  checklists = this.checklistService.checklists;
 
   checklistForm = this.fb.nonNullable.group({
     title: ["", Validators.required],
@@ -76,7 +77,7 @@ export default class HomeComponent {
   }
 
   editChecklist(checklistId: string) {
-    this.checklistService.update(checklistId, this.checklistForm.getRawValue());
+    this.checklistService.edit(checklistId, this.checklistForm.getRawValue());
   }
 
   deleteChecklist(id: string) {

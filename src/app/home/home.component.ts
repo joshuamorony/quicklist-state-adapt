@@ -81,6 +81,6 @@ export default class HomeComponent {
   }
 
   deleteChecklist(id: string) {
-    this.checklistService.remove(id);
+    this.checklistService.remove$.next(id);
   }
 }

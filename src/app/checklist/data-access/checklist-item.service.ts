@@ -21,14 +21,14 @@ export class ChecklistItemService {
     .loadChecklistItems()
     .pipe(toSource("[Storage] checklist items loaded"));
 
-  private add$ = new Source<AddChecklistItem>("[Checklist Items] add");
-  private remove$ = new Source<RemoveChecklistItem>("[Checklist Items] remove");
-  private edit$ = new Source<EditChecklistItem>("[Checklist Items] edit");
-  private clearChecklistItems$ = new Source<RemoveChecklist>(
-    "[Checklist Items] removeAllItems"
+  add$ = new Source<AddChecklistItem>("[Checklist Items] add");
+  remove$ = new Source<RemoveChecklistItem>("[Checklist Items] remove");
+  edit$ = new Source<EditChecklistItem>("[Checklist Items] edit");
+  checklistRemoved$ = new Source<RemoveChecklist>(
+    "[Checklist Items] checklistRemoved$"
   );
-  private toggle$ = new Source<RemoveChecklistItem>("[Checklist Items] toggle");
-  private reset$ = new Source<RemoveChecklist>("[Checklist Items] reset");
+  toggle$ = new Source<RemoveChecklistItem>("[Checklist Items] toggle");
+  reset$ = new Source<RemoveChecklist>("[Checklist Items] reset");
 
   private store = adapt(["checklistItems", initialState, checklistItemsAdapter], {
     loadChecklistItems: this.checklistItemsLoaded$,
@@ -37,7 +37,7 @@ export class ChecklistItemService {
     edit: this.edit$,
     toggle: this.toggle$,
     reset: this.reset$,
-    clearChecklistItems: this.clearChecklistItems$,
+    clearChecklistItems: this.checklistRemoved$,
   });
 
   loaded = toSignal(this.store.loaded$, { requireSync: true });
@@ -48,28 +48,4 @@ export class ChecklistItemService {
       this.storageService.saveChecklistItems(this.checklistItems());
     }
   });
-
-  reset(checklistId: RemoveChecklist) {
-    this.reset$.next(checklistId)
-  }
-
-  toggle(itemId: RemoveChecklistItem) {
-    this.toggle$.next(itemId);
-  }
-
-  add(item: AddChecklistItem) {
-    this.add$.next(item)
-  }
-
-  edit(item: EditChecklistItem) {
-    this.edit$.next(item);
-  }
-
-  remove(id: RemoveChecklistItem) {
-    this.remove$.next(id);
-  }
-
-  clearChecklistItems(checklistId: RemoveChecklist) {
-    this.clearChecklistItems$.next(checklistId);
-  }
 }

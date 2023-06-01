@@ -5,11 +5,7 @@ import { Action } from "@state-adapt/core";
 import { Source, toSource } from "@state-adapt/rxjs";
 import { map } from "rxjs";
 import { ChecklistItemService } from "../../checklist/data-access/checklist-item.service";
-import {
-  AddChecklist,
-  EditChecklist,
-  RemoveChecklist,
-} from "../interfaces/checklist";
+import { AddChecklist, EditChecklist } from "../interfaces/checklist";
 import { initialState, checklistsAdapter } from "./checklist.adapter";
 import { StorageService } from "./storage.service";
 
@@ -25,7 +21,7 @@ export class ChecklistService {
     .pipe(toSource("[Storage] checklists loaded"));
 
   private add$ = new Source<AddChecklist>("[Checklists] add");
-  private remove$ = new Source<RemoveChecklist>("[Checklists] remove");
+  remove$ = this.checklistItemService.checklistRemoved$;
   private edit$ = new Source<EditChecklist>("[Checklists] edit");
 
   private store = adapt(["checklists", initialState, checklistsAdapter], {
@@ -46,11 +42,6 @@ export class ChecklistService {
 
   add(checklist: AddChecklist) {
     this.add$.next(checklist);
-  }
-
-  remove(id: string) {
-    this.checklistItemService.clearChecklistItems(id);
-    this.remove$.next(id);
   }
 
   edit(id: string, data: AddChecklist) {

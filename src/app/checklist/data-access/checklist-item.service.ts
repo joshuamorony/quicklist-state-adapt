@@ -15,7 +15,7 @@ import { checklistItemsAdapter, initialState } from "./checklist-item.adapter";
   providedIn: "root",
 })
 export class ChecklistItemService {
-  storageService = inject(StorageService);
+  private storageService = inject(StorageService);
 
   private checklistItemsLoaded$ = this.storageService
     .loadChecklistItems()
@@ -30,7 +30,7 @@ export class ChecklistItemService {
   private toggle$ = new Source<RemoveChecklistItem>("[Checklist Items] toggle");
   private reset$ = new Source<RemoveChecklist>("[Checklist Items] reset");
 
-  store = adapt(["checklistItems", initialState, checklistItemsAdapter], {
+  private store = adapt(["checklistItems", initialState, checklistItemsAdapter], {
     loadChecklistItems: this.checklistItemsLoaded$,
     add: this.add$,
     remove: this.remove$,

@@ -17,8 +17,8 @@ import { StorageService } from "./storage.service";
   providedIn: "root",
 })
 export class ChecklistService {
-  checklistItemService = inject(ChecklistItemService);
-  storageService = inject(StorageService);
+  private checklistItemService = inject(ChecklistItemService);
+  private storageService = inject(StorageService);
 
   private checklistsLoaded$ = this.storageService
     .loadChecklists()
@@ -28,7 +28,7 @@ export class ChecklistService {
   private remove$ = new Source<RemoveChecklist>("[Checklists] remove");
   private edit$ = new Source<EditChecklist>("[Checklists] edit");
 
-  store = adapt(["checklists", initialState, checklistsAdapter], {
+  private store = adapt(["checklists", initialState, checklistsAdapter], {
     loadChecklists: this.checklistsLoaded$,
     add: this.add$.pipe(map((checklist) => this.addIdToChecklist(checklist))),
     remove: this.remove$,

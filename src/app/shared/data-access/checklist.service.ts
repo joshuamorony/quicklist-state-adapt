@@ -20,9 +20,9 @@ export class ChecklistService {
     .loadChecklists()
     .pipe(toSource("[Storage] checklists loaded"));
 
-  private add$ = new Source<AddChecklist>("[Checklists] add");
+  add$ = new Source<AddChecklist>("[Checklists] add");
+  edit$ = new Source<EditChecklist>("[Checklists] edit");
   remove$ = this.checklistItemService.checklistRemoved$;
-  private edit$ = new Source<EditChecklist>("[Checklists] edit");
 
   private store = adapt(["checklists", initialState, checklistsAdapter], {
     loadChecklists: this.checklistsLoaded$,
@@ -39,14 +39,6 @@ export class ChecklistService {
       this.storageService.saveChecklists(this.checklists());
     }
   });
-
-  add(checklist: AddChecklist) {
-    this.add$.next(checklist);
-  }
-
-  edit(id: string, data: AddChecklist) {
-    this.edit$.next({ id, data });
-  }
 
   private addIdToChecklist(checklist: Action<AddChecklist, string>) {
     return {

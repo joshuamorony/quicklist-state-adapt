@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, computed, effect, signal } from "@angular/core";
+import { Component, computed, effect, inject, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { FormBuilder, Validators } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
@@ -22,16 +22,17 @@ import { ChecklistItemListComponent } from "./ui/checklist-item-list.component";
   ],
   selector: "app-checklist",
   template: `
-    <app-checklist-item-header *ngIf="checklist() as checklist"
+    <app-checklist-item-header
+      *ngIf="checklist() as checklist"
       [checklist]="checklist"
       (addItem)="checklistItemBeingEdited.set({})"
-      (resetChecklist)="resetChecklistItems$.next($event)"
+      (resetChecklist)="cis.reset$.next($event)"
     />
 
     <app-checklist-item-list
       [checklistItems]="items()"
-      (toggle)="toggleChecklistItem$.next($event)"
-      (delete)="deleteChecklistItem$.next($event)"
+      (toggle)="cis.toggle$.next($event)"
+      (delete)="cis.remove$.next($event)"
       (edit)="checklistItemBeingEdited.set($event)"
     />
 
@@ -43,12 +44,12 @@ import { ChecklistItemListComponent } from "./ui/checklist-item-list.component";
           (close)="checklistItemBeingEdited.set(null)"
           (save)="
             checklistItemBeingEdited()?.id
-              ? editChecklistItem$.next({
+              ? cis.edit$.next({
                 id: checklistItemBeingEdited()!.id!,
                 data: checklistItemForm.getRawValue(),
               })
-              : addChecklistItem$.next({
-                item: this.checklistItemForm.getRawValue(),
+              : cis.add$.next({
+                item: checklistItemForm.getRawValue(),
                 checklistId: checklist()?.id!,
               })
           "
@@ -58,18 +59,23 @@ import { ChecklistItemListComponent } from "./ui/checklist-item-list.component";
   `,
 })
 export default class ChecklistComponent {
+  cs = inject(ChecklistService);
+  cis = inject(ChecklistItemService);
+  fb = inject(FormBuilder);
+  route = inject(ActivatedRoute);
+
   checklistItemBeingEdited = signal<Partial<ChecklistItem> | null>(null);
 
   params = toSignal(this.route.paramMap);
 
   items = computed(() =>
-    this.checklistItemService
+    this.cis
       .checklistItems()
       .filter((item) => item.checklistId === this.params()?.get("id"))
   );
 
   checklist = computed(() =>
-    this.checklistService
+    this.cs
       .checklists()
       .find((checklist) => checklist.id === this.params()?.get("id"))
   );
@@ -78,18 +84,7 @@ export default class ChecklistComponent {
     title: ["", Validators.required],
   });
 
-  addChecklistItem$ = this.checklistItemService.add$;
-  editChecklistItem$ = this.checklistItemService.edit$;
-  toggleChecklistItem$ = this.checklistItemService.toggle$;
-  resetChecklistItems$ = this.checklistItemService.reset$;
-  deleteChecklistItem$ = this.checklistItemService.remove$;
-
-  constructor(
-    private fb: FormBuilder,
-    private route: ActivatedRoute,
-    private checklistService: ChecklistService,
-    private checklistItemService: ChecklistItemService
-  ) {
+  constructor() {
     // TODO: Use [patchValue] directive to react to signal in template
     effect(() => {
       const item = this.checklistItemBeingEdited();

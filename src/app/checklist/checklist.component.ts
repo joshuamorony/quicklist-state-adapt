@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, computed, signal } from "@angular/core";
+import { Component, computed, effect, signal } from "@angular/core";
 import { toSignal } from "@angular/core/rxjs-interop";
 import { FormBuilder, Validators } from "@angular/forms";
 import { ActivatedRoute } from "@angular/router";
@@ -24,27 +24,33 @@ import { ChecklistItemListComponent } from "./ui/checklist-item-list.component";
   template: `
     <app-checklist-item-header *ngIf="checklist() as checklist"
       [checklist]="checklist"
-      (addItem)="formModalIsOpen.set(true)"
-      (resetChecklist)="resetChecklistItems($event)"
+      (addItem)="checklistItemBeingEdited.set({})"
+      (resetChecklist)="resetChecklistItems$.next($event)"
     />
 
     <app-checklist-item-list
       [checklistItems]="items()"
-      (toggle)="toggleChecklistItem($event)"
-      (delete)="deleteChecklistItem($event)"
-      (edit)="openEditModal($event)"
+      (toggle)="toggleChecklistItem$.next($event)"
+      (delete)="deleteChecklistItem$.next($event)"
+      (edit)="checklistItemBeingEdited.set($event)"
     />
 
-    <app-modal [isOpen]="formModalIsOpen()">
+    <app-modal [isOpen]="!!checklistItemBeingEdited()">
       <ng-template>
         <app-form-modal
-          [title]="checklistItemIdBeingEdited() ? 'Edit Item' : 'Create item'"
+          [title]="checklistItemBeingEdited()?.id ? 'Edit Item' : 'Create item'"
           [formGroup]="checklistItemForm"
-          (close)="dismissModal()"
+          (close)="checklistItemBeingEdited.set(null)"
           (save)="
-            checklistItemIdBeingEdited()
-              ? editChecklistItem(checklistItemIdBeingEdited()!)
-              : addChecklistItem(checklist()?.id)
+            checklistItemBeingEdited()?.id
+              ? editChecklistItem$.next({
+                id: checklistItemBeingEdited()!.id!,
+                data: checklistItemForm.getRawValue(),
+              })
+              : addChecklistItem$.next({
+                item: this.checklistItemForm.getRawValue(),
+                checklistId: checklist()?.id!,
+              })
           "
         ></app-form-modal>
       </ng-template>
@@ -52,8 +58,7 @@ import { ChecklistItemListComponent } from "./ui/checklist-item-list.component";
   `,
 })
 export default class ChecklistComponent {
-  formModalIsOpen = signal(false);
-  checklistItemIdBeingEdited = signal<string | null>(null);
+  checklistItemBeingEdited = signal<Partial<ChecklistItem> | null>(null);
 
   params = toSignal(this.route.paramMap);
 
@@ -73,51 +78,26 @@ export default class ChecklistComponent {
     title: ["", Validators.required],
   });
 
+  addChecklistItem$ = this.checklistItemService.add$;
+  editChecklistItem$ = this.checklistItemService.edit$;
+  toggleChecklistItem$ = this.checklistItemService.toggle$;
+  resetChecklistItems$ = this.checklistItemService.reset$;
+  deleteChecklistItem$ = this.checklistItemService.remove$;
+
   constructor(
     private fb: FormBuilder,
     private route: ActivatedRoute,
     private checklistService: ChecklistService,
     private checklistItemService: ChecklistItemService
-  ) {}
-
-  dismissModal() {
-    this.formModalIsOpen.set(false);
-    this.checklistItemIdBeingEdited.set(null);
-  }
-
-  addChecklistItem(checklistId: string | undefined) {
-    if (checklistId) {
-      this.checklistItemService.add({
-        item: this.checklistItemForm.getRawValue(),
-        checklistId,
-      });
-    }
-  }
-
-  editChecklistItem(checklistItemId: string) {
-    this.checklistItemService.edit({
-      id: checklistItemId,
-      data: this.checklistItemForm.getRawValue(),
+  ) {
+    // TODO: Use [patchValue] directive to react to signal in template
+    effect(() => {
+      const item = this.checklistItemBeingEdited();
+      if (item) {
+        this.checklistItemForm.patchValue({
+          title: item.title,
+        });
+      }
     });
-  }
-
-  openEditModal(checklistItem: ChecklistItem) {
-    this.checklistItemForm.patchValue({
-      title: checklistItem.title,
-    });
-    this.checklistItemIdBeingEdited.set(checklistItem.id);
-    this.formModalIsOpen.set(true);
-  }
-
-  toggleChecklistItem(itemId: string) {
-    this.checklistItemService.toggle(itemId);
-  }
-
-  resetChecklistItems(checklistId: string) {
-    this.checklistItemService.reset(checklistId);
-  }
-
-  deleteChecklistItem(id: string) {
-    this.checklistItemService.remove(id);
   }
 }
